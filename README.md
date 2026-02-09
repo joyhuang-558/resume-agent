@@ -113,17 +113,30 @@ LLM_MODEL=openai/gpt-4o-mini  # Or other OpenRouter supported models
 
 ### API Keys
 
-Only one **OpenRouter API key** is needed:
+**Only one OpenRouter API key is needed!**
 - LLM queries: Through OpenRouter
 - Embeddings: Also through OpenRouter (using OpenAI embedding models)
 
-## 📚 Documentation
+Get your API key from: https://openrouter.ai/settings/keys
 
-- [QUICKSTART.md](QUICKSTART.md) - Quick start guide
-- [ARCHITECTURE.md](ARCHITECTURE.md) - Architecture documentation
-- [EXAMPLES.md](EXAMPLES.md) - Usage examples
-- [INSTALL.md](INSTALL.md) - Installation guide
-- [RUN_TEST.md](RUN_TEST.md) - Running and testing guide
+**Optional**: Use FastEmbed for local embeddings (no API key needed for embeddings):
+```bash
+# In .env file
+EMBEDDER_TYPE=fastembed
+```
+
+### Usage Tips
+
+**Important**: When inserting text, you must use the `insert` command prefix:
+```
+> insert My name is John Doe...
+```
+
+**Common Commands**:
+- `insert <text>` - Insert text into knowledge base
+- `file <path>` - Insert file (PDF/TXT) into knowledge base
+- `<question>` - Query the knowledge base
+- `exit` - Exit the program
 
 ## 🔧 Tech Stack
 

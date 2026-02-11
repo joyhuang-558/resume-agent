@@ -1,5 +1,6 @@
 # Core dependencies
 agno>=2.4.0
+cohere>=5.0.0
 lancedb>=0.25.0
 
 # Environment management

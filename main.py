@@ -118,7 +118,8 @@ async def interactive_mode(agent: Agent, knowledge_tool: InsertKnowledgeTool):
     logger.info("=" * 60)
     logger.info("Commands:")
     logger.info("  - Type a question to query the knowledge base")
-    logger.info("  - Type 'insert <text>' to insert text")
+    logger.info("  - Type 'insert <text>' to insert text (single line)")
+    logger.info("  - Type 'insert' (alone) to start multi-line input mode")
     logger.info("  - Type 'file <path>' to insert a file")
     logger.info("  - Type 'exit' to quit")
     logger.info("=" * 60)
@@ -133,7 +134,31 @@ async def interactive_mode(agent: Agent, knowledge_tool: InsertKnowledgeTool):
             if user_input.lower() == "exit":
                 break
             
-            if user_input.startswith("insert "):
+            if user_input.lower() == "insert":
+                # Multi-line input mode
+                logger.info("Multi-line input mode. Enter your text (press Enter twice or type 'END' on a new line to finish):")
+                lines = []
+                while True:
+                    try:
+                        line = input("  ").strip()
+                        if line.upper() == "END":
+                            break
+                        if not line and lines:  # Empty line after content means finish
+                            break
+                        if line:
+                            lines.append(line)
+                    except (EOFError, KeyboardInterrupt):
+                        break
+                
+                if lines:
+                    text = "\n".join(lines)
+                    result = knowledge_tool.insert_knowledge(text=text)
+                    logger.info(f"✓ {result}")
+                else:
+                    logger.warning("No text provided")
+            
+            elif user_input.startswith("insert "):
+                # Single line insert
                 text = user_input[7:].strip()
                 if text:
                     result = knowledge_tool.insert_knowledge(text=text)
@@ -177,8 +202,8 @@ async def main():
     # Create knowledge insert tool
     knowledge_tool = InsertKnowledgeTool(knowledge_base)
     
-    # Create agent
-    agent = create_knowledge_agent(knowledge_base)
+    # Create agent with insert tools enabled
+    agent = create_knowledge_agent(knowledge_base, knowledge_tool=knowledge_tool, enable_insert_tools=True)
     
     # Parse command line arguments
     if len(sys.argv) > 1:

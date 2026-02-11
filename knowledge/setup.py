@@ -6,136 +6,41 @@ import logging
 import os
 from typing import Optional
 from agno.knowledge.knowledge import Knowledge
+from agno.knowledge.reranker.cohere import CohereReranker
 from agno.vectordb.lancedb import LanceDb
 from agno.vectordb.search import SearchType
 
 logger = logging.getLogger(__name__)
 
-# Import chunking strategies with error handling
-try:
-    from agno.knowledge.chunking.semantic import SemanticChunking
-except ImportError:
-    try:
-        # Try alternative import path
-        from agno.knowledge.chunking.semantic_chunking import SemanticChunking
-    except ImportError:
-        SemanticChunking = None
-        logger.warning("SemanticChunking not available. Install chonkie: pip install 'chonkie[semantic]'")
-
-try:
-    from agno.knowledge.chunking.document import DocumentChunking
-except ImportError:
-    try:
-        from agno.knowledge.chunking.document_chunking import DocumentChunking
-    except ImportError:
-        DocumentChunking = None
-
-try:
-    from agno.knowledge.chunking.fixed import FixedSizeChunking
-except ImportError:
-    try:
-        from agno.knowledge.chunking.fixed_size_chunking import FixedSizeChunking
-    except ImportError:
-        FixedSizeChunking = None
-
 from knowledge.config import KnowledgeConfig
 
 
-def create_chunking_strategy(config: KnowledgeConfig):
-    """Create chunking strategy based on configuration"""
-    if config.chunking_strategy == "semantic":
-        if SemanticChunking is None:
-            logger.warning("SemanticChunking not available, falling back to fixed_size. Install: pip install 'chonkie[semantic]'")
-            if FixedSizeChunking is not None:
-                return FixedSizeChunking(chunk_size=config.chunk_size, overlap=config.chunk_overlap)
-            else:
-                return None
-        return SemanticChunking()
-    elif config.chunking_strategy == "document":
-        if DocumentChunking is None:
-            logger.warning("DocumentChunking not available, using default")
-            return None
-        return DocumentChunking()
-    elif config.chunking_strategy == "fixed_size":
-        if FixedSizeChunking is None:
-            logger.warning("FixedSizeChunking not available, using default")
-            return None
-        return FixedSizeChunking(
-            chunk_size=config.chunk_size,
-            overlap=config.chunk_overlap
-        )
-    else:
-        logger.warning(f"Unknown chunking strategy: {config.chunking_strategy}, using default")
-        return None
-
-
 def create_embedder(config: KnowledgeConfig):
-    """Create embedder based on configuration"""
-    if config.embedder_type == "fastembed":
-        try:
-            from agno.knowledge.embedder.qdrant_fastembed import FastEmbedEmbedder
-            return FastEmbedEmbedder(model_name=config.fastembed_model)
-        except ImportError:
-            logger.warning("FastEmbed not available, falling back to default embedder")
-            return None
-    elif config.embedder_type == "openrouter":
-        try:
-            # Use OpenAI embedder with OpenRouter endpoint
-            api_key = os.getenv("OPENROUTER_API_KEY")
-            if not api_key:
-                logger.warning("OPENROUTER_API_KEY not set, falling back to default embedder")
-                return None
-            
-            from agno.knowledge.embedder.openai import OpenAIEmbedder
-            # Configure OpenAIEmbedder to use OpenRouter endpoint
-            # Note: OpenRouter uses model ID format like "openai/text-embedding-3-small"
-            # But OpenAIEmbedder expects just the model name, so we extract it
-            model_id = config.openrouter_model or "text-embedding-3-small"
-            # Remove "openai/" prefix if present
-            if "/" in model_id:
-                model_id = model_id.split("/")[-1]
-            
-            embedder = OpenAIEmbedder(
-                base_url="https://openrouter.ai/api/v1",
-                api_key=api_key,
-                id=model_id  # Use 'id' parameter, not 'model'
-            )
-            logger.info(f"Using OpenAI embedder with OpenRouter endpoint: {model_id}")
-            return embedder
-        except ImportError:
-            logger.warning("OpenAI embedder not available, falling back to default embedder")
-            return None
-    else:
-        # Use default embedder (OpenAI)
-        # Try to use OpenRouter API key if available, otherwise use OpenAI API key
-        openrouter_key = os.getenv("OPENROUTER_API_KEY")
-        openai_key = os.getenv("OPENAI_API_KEY")
-        
-        if openrouter_key and not openai_key:
-            # If only OpenRouter key is set, use it with OpenRouter endpoint
-            logger.info("Using OpenRouter API key for embeddings (no OpenAI key set)")
-            try:
-                from agno.knowledge.embedder.openai import OpenAIEmbedder
-                embedder = OpenAIEmbedder(
-                    base_url="https://openrouter.ai/api/v1",
-                    api_key=openrouter_key,
-                    id="text-embedding-3-small"  # Use 'id' parameter, not 'model'
-                )
-                logger.info("Configured OpenAI embedder to use OpenRouter endpoint")
-                return embedder
-            except Exception as e:
-                logger.warning(f"Failed to configure OpenRouter embedder: {e}")
-                logger.warning("Falling back to default embedder (requires OpenAI API key)")
-        elif openai_key:
-            # Use OpenAI API key directly
-            logger.info("Using OpenAI API key for embeddings")
-            return None  # Let Agno use default OpenAI embedder with OPENAI_API_KEY
-        else:
-            logger.warning(
-                "No API key set for embeddings. "
-                "Set OPENROUTER_API_KEY or OPENAI_API_KEY, or use FastEmbed (EMBEDDER_TYPE=fastembed)"
-            )
-        
+    """Create embedder using OpenRouter (OPENROUTER_API_KEY required).
+    Ensure embedder output dimensions match what the vector DB expects; LanceDB
+    creates the vector column from the embedder when the table is first created.
+    Changing dimensions later requires a new table or migration.
+    """
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        logger.warning("OPENROUTER_API_KEY not set; embeddings will fail until it is set.")
+        return None
+    try:
+        from agno.knowledge.embedder.openai import OpenAIEmbedder
+        model_id = config.openrouter_model or "text-embedding-3-small"
+        if "/" in model_id:
+            model_id = model_id.split("/")[-1]
+        # dimensions=1536 matches text-embedding-3-small default; must match vector DB schema
+        embedder = OpenAIEmbedder(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=api_key,
+            id=model_id,
+            dimensions=1536,
+        )
+        logger.info(f"Using OpenRouter embedder: {model_id}")
+        return embedder
+    except Exception as e:
+        logger.warning(f"Failed to create OpenRouter embedder: {e}")
         return None
 
 
@@ -235,15 +140,16 @@ def create_knowledge_base(config: Optional[KnowledgeConfig] = None) -> Knowledge
     try:
         # Now initialize Agno's LanceDb normally - it will use our patched connect
         # Agno will create the table with correct schema automatically
+        # Vector search (no tantivy); CohereReranker improves result ordering (needs COHERE_API_KEY)
         vector_db_params = {
             "table_name": config.table_name,
             "uri": config.uri,
-            "search_type": SearchType.vector,  # Use vector search to avoid tantivy requirement
+            "search_type": SearchType.vector,
+            "reranker": CohereReranker(),
         }
-        
         if embedder:
             vector_db_params["embedder"] = embedder
-        
+
         vector_db = LanceDb(**vector_db_params)
         logger.info(f"LanceDB initialized successfully: table={config.table_name}, uri={config.uri}")
     finally:

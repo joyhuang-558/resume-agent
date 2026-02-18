@@ -44,6 +44,10 @@ dropbox/*.txt
 .env
 .env.local
 
+# Google API server (never commit secrets)
+google_api_server/credentials.json
+google_api_server/token.json
+
 # Logs
 *.log
 

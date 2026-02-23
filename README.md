@@ -1,169 +1,137 @@
 # Resume Agent
 
-An end-to-end ML Agent system for quickly screening and understanding multiple candidates. Supports text input and file uploads, uses optimized chunking strategies (Semantic Chunking) for resume processing, helping HR and recruiters efficiently manage candidate information.
+A resume and document knowledge agent built with Agno + LanceDB. It ingests text and files into a searchable vector knowledge base, supports RAG-style candidate Q&A, and can optionally query Gmail via Agno Gmail toolkit.
 
-## 🌟 Features
+## Features
 
-- ✅ **Text Input**: Directly insert candidate information into the knowledge base
-- ✅ **File Upload**: Batch upload support for PDF and TXT files
-- ✅ **Smart Chunking**: Uses Semantic Chunking strategy optimized for resumes (chunk_size=500, similarity_threshold=0.5)
-- ✅ **Fast Screening**: Quickly find qualified candidates based on semantic search
-- ✅ **Knowledge Q&A**: Agent can answer various questions about candidates
-- ✅ **Auto Ingestion**: Supports automatic monitoring and ingestion from dropbox folder
-- ✅ **Vector Storage**: Uses LanceDB for local storage, no external services required
+- Resume knowledge ingestion from text, PDF, and TXT files.
+- Local vector storage with LanceDB for semantic retrieval.
+- Interactive agent Q&A over ingested candidate data.
+- Dropbox-style folder monitoring for automatic ingestion.
+- Optional Gmail integration (read-focused toolkit usage) for inbox-based screening workflows.
+- Optional standalone Google API server for OAuth and direct Gmail/Calendar endpoint testing.
 
-## 🏗️ Architecture
+## Architecture
 
-- **Knowledge Base**: Agno Knowledge Module
-- **Vector Store**: LanceDB (local storage)
-- **LLM**: OpenRouter (supports multiple models)
-- **Embeddings**: OpenRouter API (using OpenAI embedding models)
-- **Chunking**: Semantic Chunking (optimized for resumes)
-- **File Processing**: PDF and TXT file support
+- `knowledge/`: Knowledge base setup, embedding config, LanceDB integration.
+- `tools/knowledge_tool.py`: Insert text/files into the knowledge base.
+- `tools/gmail_tools.py`: Creates Gmail toolkit with read-only filtering where supported.
+- `agent/knowledge_agent.py`: Builds the main Agno agent and injects optional tools.
+- `main.py`: App entrypoint (`demo`, `interactive`, `monitor`).
+- `google_api_server/main.py`: Standalone FastAPI OAuth + Gmail/Calendar read endpoints.
 
-## 📋 Project Structure
+## Project Structure
 
-```
-resume agent/
-├── dropbox/              # Drop files folder (auto-ingestion)
-├── knowledge/           # Knowledge base modules
-│   ├── config.py       # Configuration management
-│   └── setup.py        # Knowledge base initialization
-├── tools/               # Tools modules
-│   └── knowledge_tool.py  # Knowledge insert tool
-├── ingestion/          # Ingestion modules
-│   └── dropbox_monitor.py  # File monitoring
-├── agent/              # Agent modules
-│   └── knowledge_agent.py  # Knowledge agent
-├── main.py             # Main entry point
-├── batch_upload.py     # Batch upload script
-└── requirements.txt    # Dependencies
+```text
+resume-agent/
+├── agent/
+├── google_api_server/
+├── ingestion/
+├── knowledge/
+├── tools/
+├── batch_upload.py
+├── config.example.env
+├── main.py
+└── requirements.txt
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Install Dependencies
+### 1) Install dependencies
 
 ```bash
-# Using Anaconda (recommended)
-conda activate base
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
-### 2. Configure Environment Variables
-
-Copy the example config file and add your OpenRouter API key:
+### 2) Configure environment
 
 ```bash
 cp config.example.env .env
-# Edit .env file and add your OPENROUTER_API_KEY
 ```
 
-### 3. Run the Application
+Required in `.env`:
 
-**Interactive Mode (Recommended):**
 ```bash
-python main.py interactive
+OPENROUTER_API_KEY=your_openrouter_api_key
+LLM_MODEL=openai/gpt-4o-mini
 ```
 
-**Batch Upload Resumes:**
+Optional Gmail settings:
+
 ```bash
-python batch_upload.py /path/to/resumes/
-```
-
-**Monitor Mode:**
-```bash
-python main.py monitor
-# Then drop PDF files into dropbox/ folder
-```
-
-## 💡 Usage Examples
-
-### Insert Text
-```
-> insert My name is John Doe. I have 5 years of experience in Python...
-```
-
-### Upload File
-```
-> file ./dropbox/john_doe_resume.pdf
-```
-
-### Query Candidates
-```
-> What is John Doe's education background?
-> Who has experience with machine learning?
-> Find candidates with Python skills
-```
-
-## ⚙️ Configuration
-
-### Chunking Strategy
-
-Optimized for resumes using Semantic Chunking:
-- `chunk_size=500`: Optimal chunk size for resumes
-- `similarity_threshold=0.5`: Semantic similarity threshold
-
-### LLM Model
-
-Default: `openai/gpt-4o-mini`, configurable in `.env` file:
-```bash
-LLM_MODEL=openai/gpt-4o-mini  # Or other OpenRouter supported models
-```
-
-### API Keys
-
-**Only one OpenRouter API key is needed!**
-- LLM queries: Through OpenRouter
-- Embeddings: Also through OpenRouter (using OpenAI embedding models)
-
-Get your API key from: https://openrouter.ai/settings/keys
-
-**Optional**: Use FastEmbed for local embeddings (no API key needed for embeddings):
-```bash
-# In .env file
-EMBEDDER_TYPE=fastembed
-```
-
-### Gmail Toolkit (Optional)
-
-Enable Agno Gmail tools in the main agent:
-```bash
-# In .env file
 ENABLE_GMAIL_TOOLS=true
 GOOGLE_CREDENTIALS_PATH=./google_api_server/credentials.json
 GOOGLE_TOKEN_PATH=./google_api_server/token.json
 ```
 
-When enabled, the agent loads GmailTools in read-only mode (where supported), so it can query inbox content for resume screening workflows.
+### 3) Run the app
 
-### Usage Tips
+Interactive mode:
 
-**Important**: When inserting text, you must use the `insert` command prefix:
+```bash
+python3 main.py interactive
 ```
-> insert My name is John Doe...
+
+Other modes:
+
+```bash
+python3 main.py demo
+python3 main.py monitor
+python3 batch_upload.py /path/to/resumes
 ```
 
-**Common Commands**:
-- `insert <text>` - Insert text into knowledge base
-- `file <path>` - Insert file (PDF/TXT) into knowledge base
-- `<question>` - Query the knowledge base
-- `exit` - Exit the program
+## Interactive Commands
 
-## 🔧 Tech Stack
+- `insert <text>`: Insert single-line text into knowledge base.
+- `insert`: Start multi-line input mode.
+- `file <path>`: Insert a PDF/TXT file.
+- `<question>`: Query the knowledge base (and enabled tools).
+- `exit`: Exit the app.
 
-- **Python 3.9+**
-- **Agno** - Knowledge Module
-- **LanceDB** - Vector Database
-- **OpenRouter** - LLM API Gateway
-- **Chonkie** - Semantic Chunking
-- **pypdf** - PDF Processing
-- **watchdog** - File Monitoring
+Example prompts:
 
-## 📝 License
+```text
+Show latest 5 unread emails
+Search emails about python resume
+Who has machine learning experience?
+```
 
-This project is for learning and research purposes only.
+## Gmail Integration Flow
 
-## 🤝 Contributing
+1. Create Google OAuth client (Web application) with redirect URI:
+   `http://localhost:8000/callback`
+2. Put OAuth client JSON at:
+   `google_api_server/credentials.json`
+3. Authorize once to generate token:
+   - Run: `python3 -m uvicorn main:app --reload --port 8000` in `google_api_server/`
+   - Open: `http://127.0.0.1:8000/auth`
+4. Ensure `.env` points to `credentials.json` and `token.json`.
+5. Run `python3 main.py interactive` and use Gmail prompts.
 
-Issues and Pull Requests are welcome!
+## Standalone Google API Server (Optional)
+
+The `google_api_server` folder provides a separate FastAPI service for direct API checks:
+
+- `GET /` status + auth state
+- `GET /auth` start OAuth
+- `GET /calendar/events` list calendar events
+- `GET /gmail/messages` list recent message IDs
+- `GET /gmail/messages/{message_id}` get one message summary
+
+Install/run:
+
+```bash
+cd google_api_server
+python3 -m pip install -r requirements.txt
+python3 -m uvicorn main:app --reload --port 8000
+```
+
+## Notes
+
+- Keep secrets out of git (`.env`, `credentials.json`, `token.json` are ignored).
+- The agent requires `OPENROUTER_API_KEY` at startup.
+- Current Gmail test responses may be empty if the mailbox has no messages.
+
+## License
+
+For learning and research purposes.

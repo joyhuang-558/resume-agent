@@ -4,6 +4,7 @@ Demonstrates text insertion, file ingestion, and agent queries
 """
 import asyncio
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -28,6 +29,14 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    """Parse boolean-like environment variable values."""
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
 async def demo_text_insertion(knowledge_tool: InsertKnowledgeTool):
@@ -201,9 +210,26 @@ async def main():
     
     # Create knowledge insert tool
     knowledge_tool = InsertKnowledgeTool(knowledge_base)
+
+    # Optional Gmail toolkit configuration
+    enable_gmail_tools = _env_bool("ENABLE_GMAIL_TOOLS", default=False)
+    gmail_credentials_path = os.getenv("GOOGLE_CREDENTIALS_PATH")
+    gmail_token_path = os.getenv("GOOGLE_TOKEN_PATH")
+    if enable_gmail_tools:
+        logger.info(
+            "Gmail toolkit is enabled via environment. "
+            f"credentials_path={gmail_credentials_path}, token_path={gmail_token_path}"
+        )
     
-    # Create agent with insert tools enabled
-    agent = create_knowledge_agent(knowledge_base, knowledge_tool=knowledge_tool, enable_insert_tools=True)
+    # Create agent with insert tools enabled and optional Gmail tools
+    agent = create_knowledge_agent(
+        knowledge_base,
+        knowledge_tool=knowledge_tool,
+        enable_insert_tools=True,
+        enable_gmail_tools=enable_gmail_tools,
+        gmail_credentials_path=gmail_credentials_path,
+        gmail_token_path=gmail_token_path,
+    )
     
     # Parse command line arguments
     if len(sys.argv) > 1:

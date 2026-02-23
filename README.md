@@ -125,6 +125,18 @@ Get your API key from: https://openrouter.ai/settings/keys
 EMBEDDER_TYPE=fastembed
 ```
 
+### Gmail Toolkit (Optional)
+
+Enable Agno Gmail tools in the main agent:
+```bash
+# In .env file
+ENABLE_GMAIL_TOOLS=true
+GOOGLE_CREDENTIALS_PATH=./google_api_server/credentials.json
+GOOGLE_TOKEN_PATH=./google_api_server/token.json
+```
+
+When enabled, the agent loads GmailTools in read-only mode (where supported), so it can query inbox content for resume screening workflows.
+
 ### Usage Tips
 
 **Important**: When inserting text, you must use the `insert` command prefix:

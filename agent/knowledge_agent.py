@@ -9,6 +9,7 @@ from agno.knowledge.knowledge import Knowledge
 from agno.models.openrouter import OpenRouter
 from typing import Optional, List, Callable
 from tools.knowledge_tool import InsertKnowledgeTool, create_knowledge_insert_tools
+from tools.gmail_tools import create_readonly_gmail_tools
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,9 @@ def create_knowledge_agent(
     knowledge_tool: Optional[InsertKnowledgeTool] = None,
     model_id: Optional[str] = None,
     enable_insert_tools: bool = True,
+    enable_gmail_tools: bool = False,
+    gmail_credentials_path: Optional[str] = None,
+    gmail_token_path: Optional[str] = None,
     **agent_kwargs
 ) -> Agent:
     """
@@ -31,6 +35,9 @@ def create_knowledge_agent(
         model_id: OpenRouter model ID (e.g., "openai/gpt-4o-mini")
                   If None, uses LLM_MODEL from environment or default
         enable_insert_tools: Whether to enable insert_text and insert_file tools for Agent
+        enable_gmail_tools: Whether to enable Gmail read-only toolkit for Agent
+        gmail_credentials_path: Path to Google OAuth client credentials JSON
+        gmail_token_path: Path to Google OAuth token JSON
         **agent_kwargs: Additional arguments to pass to Agent constructor
         
     Returns:
@@ -68,6 +75,17 @@ def create_knowledge_agent(
         insert_tools = create_knowledge_insert_tools(knowledge_tool)
         tools.extend(insert_tools)
         logger.info("Enabled insert_text and insert_file tools for Agent")
+
+    if enable_gmail_tools:
+        gmail_tools = create_readonly_gmail_tools(
+            credentials_path=gmail_credentials_path,
+            token_path=gmail_token_path,
+        )
+        tools.append(gmail_tools)
+        logger.info(
+            "Enabled Gmail toolkit for Agent (read-only mode where supported): "
+            f"credentials_path={gmail_credentials_path}, token_path={gmail_token_path}"
+        )
     
     # Add any additional tools from agent_kwargs
     if 'tools' in agent_kwargs:
@@ -86,5 +104,5 @@ def create_knowledge_agent(
         **agent_kwargs
     )
     
-    logger.info("Knowledge agent created with OpenRouter, search_knowledge enabled, and insert tools")
+    logger.info("Knowledge agent created with OpenRouter, search_knowledge enabled, and configured tools")
     return agent

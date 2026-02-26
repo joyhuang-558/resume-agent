@@ -77,6 +77,7 @@ Other modes:
 ```bash
 python3 main.py demo
 python3 main.py monitor
+python3 main.py gmail_sync
 python3 batch_upload.py /path/to/resumes
 ```
 
@@ -107,6 +108,30 @@ Who has machine learning experience?
    - Open: `http://127.0.0.1:8000/auth`
 4. Ensure `.env` points to `credentials.json` and `token.json`.
 5. Run `python3 main.py interactive` and use Gmail prompts.
+
+## Gmail Resume Ingestion Sync
+
+Use `gmail_sync` to ingest Gmail message content + supported attachments into the knowledge base with message-level idempotency.
+
+- Supports attachment ingestion for `.pdf`, `.txt`, `.docx`
+- Tracks processed `message_id` values in SQLite at `GMAIL_SYNC_DB_PATH`
+- Skips already-processed messages on subsequent runs
+
+Run:
+
+```bash
+python3 main.py gmail_sync
+```
+
+Useful `.env` controls:
+
+```bash
+GMAIL_SYNC_QUERY=in:inbox
+GMAIL_SYNC_MAX_RESULTS=20
+GMAIL_SYNC_UNREAD_ONLY=true
+GMAIL_SYNC_DB_PATH=./knowledge/gmail_ingestion.db
+GMAIL_ATTACHMENTS_DIR=./dropbox/gmail
+```
 
 ## Standalone Google API Server (Optional)
 

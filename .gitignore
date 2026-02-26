@@ -35,10 +35,12 @@ ENV/
 # Knowledge base data
 knowledge/lancedb/
 *.lancedb
+knowledge/gmail_ingestion.db
 
 # Dropbox files (optional - remove if you want to track them)
 dropbox/*.pdf
 dropbox/*.txt
+dropbox/gmail/
 
 # Environment variables
 .env

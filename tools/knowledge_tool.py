@@ -5,6 +5,8 @@ Supports inserting text and files into the knowledge base
 import logging
 from typing import Optional
 from pathlib import Path
+import zipfile
+import xml.etree.ElementTree as ET
 from agno.knowledge.knowledge import Knowledge
 from agno.knowledge.reader.pdf_reader import PDFReader
 from agno.knowledge.reader.text_reader import TextReader
@@ -41,6 +43,22 @@ class InsertKnowledgeTool:
             knowledge_base: Knowledge instance to insert into
         """
         self.knowledge_base = knowledge_base
+
+    @staticmethod
+    def _extract_docx_text(path: Path) -> str:
+        """Extract plain text from a .docx file without extra dependencies."""
+        with zipfile.ZipFile(path) as archive:
+            with archive.open("word/document.xml") as doc_xml:
+                tree = ET.parse(doc_xml)
+
+        root = tree.getroot()
+        namespace = {"w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main"}
+        paragraphs = []
+        for paragraph in root.findall(".//w:p", namespace):
+            texts = [node.text for node in paragraph.findall(".//w:t", namespace) if node.text]
+            if texts:
+                paragraphs.append("".join(texts))
+        return "\n".join(paragraphs).strip()
     
     def insert_knowledge(
         self,
@@ -97,11 +115,21 @@ class InsertKnowledgeTool:
                     self.knowledge_base.insert(path=str(path), reader=reader)
                     logger.info(f"Inserted text file: {file_path}")
                     return f"Successfully inserted text file '{path.name}' into knowledge base"
+
+                elif ext == ".docx":
+                    # Extract DOCX text and insert as plain text
+                    extracted_text = self._extract_docx_text(path)
+                    if not extracted_text:
+                        raise ValueError(f"No extractable text found in DOCX file: {file_path}")
+                    docx_payload = f"Source file: {path.name}\n\n{extracted_text}"
+                    self.knowledge_base.insert(text_content=docx_payload)
+                    logger.info(f"Inserted DOCX file: {file_path}")
+                    return f"Successfully inserted DOCX file '{path.name}' into knowledge base"
                 
                 else:
                     raise ValueError(
                         f"Unsupported file type: {ext}. "
-                        f"Supported types: .txt, .pdf"
+                        f"Supported types: .txt, .pdf, .docx"
                     )
         
         except Exception as e:

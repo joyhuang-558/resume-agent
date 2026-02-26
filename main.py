@@ -20,6 +20,7 @@ from agno.agent import Agent
 from knowledge.config import KnowledgeConfig
 from knowledge.setup import create_knowledge_base
 from tools.knowledge_tool import InsertKnowledgeTool
+from tools.gmail_ingestion import GmailIngestionService
 from ingestion.dropbox_monitor import DropboxMonitor
 from agent.knowledge_agent import create_knowledge_agent
 
@@ -37,6 +38,48 @@ def _env_bool(name: str, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value.strip())
+    except ValueError:
+        logger.warning("Invalid integer for %s=%s, using default=%s", name, value, default)
+        return default
+
+
+def run_gmail_sync(knowledge_tool: InsertKnowledgeTool) -> None:
+    """Sync Gmail messages and supported attachments into knowledge base."""
+    credentials_path = os.getenv("GOOGLE_CREDENTIALS_PATH", "./google_api_server/credentials.json")
+    token_path = os.getenv("GOOGLE_TOKEN_PATH", "./google_api_server/token.json")
+    query = os.getenv("GMAIL_SYNC_QUERY", "in:inbox")
+    max_results = _env_int("GMAIL_SYNC_MAX_RESULTS", 20)
+    unread_only = _env_bool("GMAIL_SYNC_UNREAD_ONLY", default=True)
+    db_path = os.getenv("GMAIL_SYNC_DB_PATH", "./knowledge/gmail_ingestion.db")
+    attachments_dir = os.getenv("GMAIL_ATTACHMENTS_DIR", "./dropbox/gmail")
+
+    sync_service = GmailIngestionService(
+        knowledge_tool=knowledge_tool,
+        credentials_path=credentials_path,
+        token_path=token_path,
+        db_path=db_path,
+        attachments_dir=attachments_dir,
+        query=query,
+        max_results=max_results,
+        unread_only=unread_only,
+    )
+    summary = sync_service.sync()
+    logger.info(
+        "Gmail sync summary: fetched=%s processed=%s skipped_existing=%s failed=%s attachments_ingested=%s",
+        summary.fetched,
+        summary.processed,
+        summary.skipped_existing,
+        summary.failed,
+        summary.attachments_ingested,
+    )
 
 
 async def demo_text_insertion(knowledge_tool: InsertKnowledgeTool):
@@ -261,10 +304,13 @@ async def main():
         except KeyboardInterrupt:
             logger.info("Stopping monitor...")
             monitor.stop()
+
+    elif mode == "gmail_sync":
+        run_gmail_sync(knowledge_tool)
     
     else:
         logger.error(f"Unknown mode: {mode}")
-        logger.info("Available modes: demo, interactive, monitor")
+        logger.info("Available modes: demo, interactive, monitor, gmail_sync")
         sys.exit(1)
     
     logger.info("Knowledge Ingestion System stopped")

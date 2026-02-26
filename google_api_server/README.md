@@ -1,6 +1,6 @@
 # Google Calendar & Gmail API — Local Server
 
-FastAPI server that accesses **Google Calendar** and **Gmail** via OAuth 2.0. After setup, **http://localhost:8000/calendar/events** and **http://localhost:8000/gmail/messages** return JSON for the signed-in account.
+FastAPI server that accesses **Google Calendar**, **Gmail**, and a simple **Resume Agent chat endpoint** via OAuth 2.0. After setup, **http://localhost:8000/calendar/events**, **http://localhost:8000/gmail/messages**, and `POST /chat` are available.
 
 **Full setup (one-time):** [GOOGLE_CALENDAR_GMAIL_SETUP.md](../GOOGLE_CALENDAR_GMAIL_SETUP.md) in the repo root.
 
@@ -25,3 +25,34 @@ uvicorn main:app --reload --port 8000
 
 - First time: open **http://localhost:8000/auth** to authorize.
 - Then: **http://localhost:8000/calendar/events** and **http://localhost:8000/gmail/messages** return JSON.
+
+## Chat endpoint (terminal -> web shell)
+
+This project now includes a minimal web chat shell that reuses the existing Resume Agent:
+
+- Endpoint: `POST http://localhost:8000/chat`
+- Body:
+
+```json
+{
+  "message": "Show latest 5 unread emails"
+}
+```
+
+- Example:
+
+```bash
+curl -X POST "http://localhost:8000/chat" \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Search emails about Application"}'
+```
+
+You can also use **http://localhost:8000/docs** to test the `POST /chat` endpoint in a browser.
+
+## Minimal browser UI
+
+A tiny web chat shell is available at:
+
+- `http://localhost:8000/chat-ui`
+
+It calls `POST /chat` under the hood and includes quick demo prompts.

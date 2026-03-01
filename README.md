@@ -1,161 +1,145 @@
 # Resume Agent
 
-A resume and document knowledge agent built with Agno + LanceDB. It ingests text and files into a searchable vector knowledge base, supports RAG-style candidate Q&A, and can optionally query Gmail via Agno Gmail toolkit.
+An ML Agent system for screening and understanding candidates. Upload resumes (PDF/TXT), query them via natural language, and optionally access Google Calendar & Gmail via a separate API server.
 
-## Features
+---
 
-- Resume knowledge ingestion from text, PDF, and TXT files.
-- Local vector storage with LanceDB for semantic retrieval.
-- Interactive agent Q&A over ingested candidate data.
-- Dropbox-style folder monitoring for automatic ingestion.
-- Optional Gmail integration (read-focused toolkit usage) for inbox-based screening workflows.
-- Optional standalone Google API server for OAuth and direct Gmail/Calendar endpoint testing.
+## Architecture Overview
 
-## Architecture
+The project has **two subsystems** that run independently:
 
-- `knowledge/`: Knowledge base setup, embedding config, LanceDB integration.
-- `tools/knowledge_tool.py`: Insert text/files into the knowledge base.
-- `tools/gmail_tools.py`: Creates Gmail toolkit with read-only filtering where supported.
-- `agent/knowledge_agent.py`: Builds the main Agno agent and injects optional tools.
-- `main.py`: App entrypoint (`demo`, `interactive`, `monitor`).
-- `google_api_server/main.py`: Standalone FastAPI OAuth + Gmail/Calendar read endpoints.
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                           RESUME AGENT (Main)                                     │
+│  Upload PDF/TXT → LanceDB (vector store) → Agent (RAG) → Answer questions         │
+│  Tech: Agno, OpenRouter LLM, LanceDB, Cohere reranker                             │
+└─────────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      │  (Not integrated yet)
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                      GOOGLE API SERVER (Standalone)                               │
+│  OAuth → Read Calendar events / Gmail messages → Return JSON                      │
+│  Tech: FastAPI, Google API Python client                                          │
+│  Note: Data is fetched on-demand; nothing is stored in the knowledge base         │
+└─────────────────────────────────────────────────────────────────────────────────┘
+```
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+
+---
 
 ## Project Structure
 
-```text
-resume-agent/
+```
+resume agent/
+├── main.py                 # Entry point (demo / interactive / monitor)
+├── batch_upload.py         # Batch upload PDFs from a directory
+├── config.example.env      # Environment template
+├── requirements.txt
+│
 ├── agent/
-├── google_api_server/
-├── ingestion/
+│   └── knowledge_agent.py  # Agent: OpenRouter + RAG + insert tools
 ├── knowledge/
+│   ├── config.py           # Config (LanceDB, embedder, dropbox path)
+│   └── setup.py            # Knowledge base init (LanceDB + embedder)
 ├── tools/
-├── batch_upload.py
-├── config.example.env
-├── main.py
-└── requirements.txt
+│   └── knowledge_tool.py   # Insert text/file into knowledge base
+├── ingestion/
+│   └── dropbox_monitor.py  # Watch dropbox/ folder, auto-ingest new files
+├── dropbox/                # Local folder for drag-and-drop (not cloud Dropbox)
+│
+├── google_api_server/      # Standalone FastAPI service
+│   ├── main.py             # /auth, /calendar/events, /gmail/messages
+│   ├── credentials.json    # OAuth client (committed for team use)
+│   └── requirements.txt
+│
+├── ARCHITECTURE.md         # Architecture details
+├── GOOGLE_CALENDAR_GMAIL_SETUP.md
+└── DROPBOX_USAGE.md        # How to use the dropbox folder
 ```
 
-## Quick Start
+---
 
-### 1) Install dependencies
+## Setup for New Collaborators
 
-```bash
-python3 -m pip install -r requirements.txt
-```
-
-### 2) Configure environment
+### 1. Main Project
 
 ```bash
+pip install -r requirements.txt
 cp config.example.env .env
+# Edit .env: add OPENROUTER_API_KEY (required), optionally COHERE_API_KEY
 ```
 
-Required in `.env`:
+### 2. Google Calendar & Gmail (Optional)
 
-```bash
-OPENROUTER_API_KEY=your_openrouter_api_key
-LLM_MODEL=openai/gpt-4o-mini
-```
-
-Optional Gmail settings:
-
-```bash
-ENABLE_GMAIL_TOOLS=true
-GOOGLE_CREDENTIALS_PATH=./google_api_server/credentials.json
-GOOGLE_TOKEN_PATH=./google_api_server/token.json
-```
-
-### 3) Run the app
-
-Interactive mode:
-
-```bash
-python3 main.py interactive
-```
-
-Other modes:
-
-```bash
-python3 main.py demo
-python3 main.py monitor
-python3 main.py gmail_sync
-python3 batch_upload.py /path/to/resumes
-```
-
-## Interactive Commands
-
-- `insert <text>`: Insert single-line text into knowledge base.
-- `insert`: Start multi-line input mode.
-- `file <path>`: Insert a PDF/TXT file.
-- `<question>`: Query the knowledge base (and enabled tools).
-- `exit`: Exit the app.
-
-Example prompts:
-
-```text
-Show latest 5 unread emails
-Search emails about python resume
-Who has machine learning experience?
-```
-
-## Gmail Integration Flow
-
-1. Create Google OAuth client (Web application) with redirect URI:
-   `http://localhost:8000/callback`
-2. Put OAuth client JSON at:
-   `google_api_server/credentials.json`
-3. Authorize once to generate token:
-   - Run: `python3 -m uvicorn main:app --reload --port 8000` in `google_api_server/`
-   - Open: `http://127.0.0.1:8000/auth`
-4. Ensure `.env` points to `credentials.json` and `token.json`.
-5. Run `python3 main.py interactive` and use Gmail prompts.
-
-## Gmail Resume Ingestion Sync
-
-Use `gmail_sync` to ingest Gmail message content + supported attachments into the knowledge base with message-level idempotency.
-
-- Supports attachment ingestion for `.pdf`, `.txt`, `.docx`
-- Tracks processed `message_id` values in SQLite at `GMAIL_SYNC_DB_PATH`
-- Skips already-processed messages on subsequent runs
-
-Run:
-
-```bash
-python3 main.py gmail_sync
-```
-
-Useful `.env` controls:
-
-```bash
-GMAIL_SYNC_QUERY=in:inbox
-GMAIL_SYNC_MAX_RESULTS=20
-GMAIL_SYNC_UNREAD_ONLY=true
-GMAIL_SYNC_DB_PATH=./knowledge/gmail_ingestion.db
-GMAIL_ATTACHMENTS_DIR=./dropbox/gmail
-```
-
-## Standalone Google API Server (Optional)
-
-The `google_api_server` folder provides a separate FastAPI service for direct API checks:
-
-- `GET /` status + auth state
-- `GET /auth` start OAuth
-- `GET /calendar/events` list calendar events
-- `GET /gmail/messages` list recent message IDs
-- `GET /gmail/messages/{message_id}` get one message summary
-
-Install/run:
+`credentials.json` is already in `google_api_server/`. To use:
 
 ```bash
 cd google_api_server
-python3 -m pip install -r requirements.txt
-python3 -m uvicorn main:app --reload --port 8000
+pip install -r requirements.txt
+uvicorn main:app --reload --port 8000
 ```
 
-## Notes
+Open **http://localhost:8000/auth** and sign in with your Google account. Then:
 
-- Keep secrets out of git (`.env`, `credentials.json`, `token.json` are ignored).
-- The agent requires `OPENROUTER_API_KEY` at startup.
-- Current Gmail test responses may be empty if the mailbox has no messages.
+- **http://localhost:8000/calendar/events** — upcoming events
+- **http://localhost:8000/gmail/messages** — recent emails
+
+See [GOOGLE_CALENDAR_GMAIL_SETUP.md](GOOGLE_CALENDAR_GMAIL_SETUP.md) if you need to recreate credentials.
+
+---
+
+## Quick Start
+
+### Interactive mode (chat with the agent)
+
+```bash
+python main.py interactive
+```
+
+- `insert <text>` — add text to knowledge base  
+- `file <path>` — add PDF/TXT (e.g. `file dropbox/resume.pdf`)  
+- Ask questions — agent answers from the knowledge base  
+- `exit` — quit  
+
+### Monitor mode (auto-ingest from dropbox)
+
+```bash
+python main.py monitor
+# Then drop PDF/TXT files into dropbox/ — they are ingested automatically
+```
+
+### Batch upload
+
+```bash
+python batch_upload.py /path/to/resumes/
+```
+
+---
+
+## Configuration
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `OPENROUTER_API_KEY` | Required for LLM and embeddings | — |
+| `COHERE_API_KEY` | Optional; improves search ranking | — |
+| `LLM_MODEL` | OpenRouter model | `openai/gpt-4o-mini` |
+| `KNOWLEDGE_URI` | LanceDB path | `./knowledge/lancedb` |
+| `DROPBOX_PATH` | Dropbox folder | `./dropbox` |
+
+---
+
+## Tech Stack
+
+- **Python 3.9+**
+- **Agno** — Knowledge, Agent, RAG
+- **LanceDB** — Local vector store
+- **OpenRouter** — LLM and embeddings
+- **Cohere** — Reranker (optional)
+- **pypdf**, **watchdog** — PDF handling, file monitoring
+
+---
 
 ## License
 

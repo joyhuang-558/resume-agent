@@ -1,9 +1,6 @@
 # Google Calendar & Gmail — Setup Guide
 
-`credentials.json` is committed in `google_api_server/` for team use. New collaborators typically only need to:
-
-1. Start the server and open **http://localhost:8000/auth**
-2. Sign in with their Google account
+Get `credentials.json` from a teammate, or create it following the steps below. Put it in `google_api_server/`. Then start the server and open **http://localhost:8000/auth** to sign in with your Google account.
 
 ---
 
@@ -11,7 +8,7 @@
 
 Use this guide when:
 
-- `credentials.json` is missing or deleted
+- `credentials.json` is not available from a teammate
 - You need to create a new OAuth client (e.g. in a new Google Cloud project)
 
 ---

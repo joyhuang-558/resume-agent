@@ -51,7 +51,7 @@ resume agent/
 │
 ├── google_api_server/      # Standalone FastAPI service
 │   ├── main.py             # /auth, /calendar/events, /gmail/messages
-│   ├── credentials.json    # OAuth client (committed for team use)
+│   ├── credentials.json    # OAuth client (get from teammate; not in git)
 │   └── requirements.txt
 │
 ├── ARCHITECTURE.md         # Architecture details
@@ -73,7 +73,7 @@ cp config.example.env .env
 
 ### 2. Google Calendar & Gmail (Optional)
 
-`credentials.json` is already in `google_api_server/`. To use:
+Get `credentials.json` from a teammate or follow [GOOGLE_CALENDAR_GMAIL_SETUP.md](GOOGLE_CALENDAR_GMAIL_SETUP.md) to create it. Put it in `google_api_server/`. Then:
 
 ```bash
 cd google_api_server

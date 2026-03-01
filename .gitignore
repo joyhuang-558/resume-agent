@@ -46,7 +46,7 @@ dropbox/gmail/
 .env
 .env.local
 
-# Google API server (never commit secrets)
+# Google API server (share credentials.json via secure channel; do not commit)
 google_api_server/credentials.json
 google_api_server/token.json
 
